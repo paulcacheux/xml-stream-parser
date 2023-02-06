@@ -9,10 +9,10 @@ import (
 
 type XMLParser struct {
 	reader            *bufio.Reader
-	loopElements      map[string]bool
+	loopElements      []string
 	resultChannel     chan *XMLElement
-	skipElements      map[string]bool
-	attrOnlyElements  map[string]bool
+	skipElements      []string
+	attrOnlyElements  []string
 	skipOuterElements bool
 	xpathEnabled      bool
 	scratch           *scratch
@@ -24,17 +24,12 @@ func NewXMLParser(reader *bufio.Reader, loopElements ...string) *XMLParser {
 
 	x := &XMLParser{
 		reader:           reader,
-		loopElements:     map[string]bool{},
-		attrOnlyElements: map[string]bool{},
+		loopElements:     loopElements,
+		attrOnlyElements: []string{},
 		resultChannel:    make(chan *XMLElement, 256),
-		skipElements:     map[string]bool{},
+		skipElements:     []string{},
 		scratch:          &scratch{data: make([]byte, 1024)},
 		scratch2:         &scratch{data: make([]byte, 1024)},
-	}
-
-	// Register loop elements
-	for _, e := range loopElements {
-		x.loopElements[e] = true
 	}
 
 	return x
@@ -43,18 +38,14 @@ func NewXMLParser(reader *bufio.Reader, loopElements ...string) *XMLParser {
 func (x *XMLParser) SkipElements(skipElements []string) *XMLParser {
 
 	if len(skipElements) > 0 {
-		for _, s := range skipElements {
-			x.skipElements[s] = true
-		}
+		x.skipElements = append(x.skipElements, skipElements...)
 	}
 	return x
 
 }
 
 func (x *XMLParser) ParseAttributesOnly(loopElements ...string) *XMLParser {
-	for _, e := range loopElements {
-		x.attrOnlyElements[e] = true
-	}
+	x.attrOnlyElements = append(x.attrOnlyElements, loopElements...)
 	return x
 }
 
@@ -139,13 +130,13 @@ func (x *XMLParser) parse() {
 				return
 			}
 
-			if _, found := x.loopElements[element.Name]; found {
+			if stringSliceContains(x.loopElements, element.Name) {
 				if tagClosed {
 					x.resultChannel <- element
 					continue
 				}
 
-				if _, ok := x.attrOnlyElements[element.Name]; !ok {
+				if !stringSliceContains(x.attrOnlyElements, element.Name) {
 					element = x.getElementTree(element)
 				}
 				x.resultChannel <- element
@@ -154,7 +145,7 @@ func (x *XMLParser) parse() {
 				}
 			} else if x.skipOuterElements {
 
-				if _, ok := x.skipElements[element.Name]; ok && !tagClosed {
+				if stringSliceContains(x.skipElements, element.Name) && !tagClosed {
 
 					err = x.skipElement(element.Name)
 					if err != nil {
@@ -253,7 +244,7 @@ func (x *XMLParser) getElementTree(result *XMLElement) *XMLElement {
 				return result
 			}
 
-			if _, ok := x.skipElements[element.Name]; ok && !tagClosed {
+			if stringSliceContains(x.skipElements, element.Name) && !tagClosed {
 				err = x.skipElement(element.Name)
 				if err != nil {
 					result.Err = err
@@ -842,7 +833,7 @@ func (x *XMLParser) string(start byte) (string, error) {
 }
 
 // scratch taken from
-//https://github.com/bcicen/jstream
+// https://github.com/bcicen/jstream
 type scratch struct {
 	data []byte
 	fill int
@@ -880,4 +871,13 @@ func (s *scratch) addRune(r rune) int {
 	n := utf8.EncodeRune(s.data[s.fill:], r)
 	s.fill += n
 	return n
+}
+
+func stringSliceContains(slice []string, needle string) bool {
+	for _, value := range slice {
+		if value == needle {
+			return true
+		}
+	}
+	return false
 }
