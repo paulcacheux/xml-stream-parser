@@ -260,23 +260,9 @@ func (x *XMLParser) getElementTree(result *XMLElement) *XMLElement {
 				element.parent = result
 			}
 
-			if _, ok := result.Childs[element.Name]; ok {
-				result.Childs[element.Name] = append(result.Childs[element.Name], *element)
-				if x.xpathEnabled {
-					result.childs = append(result.childs, element)
-				}
-			} else {
-				var childs []XMLElement
-				childs = append(childs, *element)
-				if result.Childs == nil {
-					result.Childs = map[string][]XMLElement{}
-				}
-				result.Childs[element.Name] = childs
-
-				if x.xpathEnabled {
-					result.childs = append(result.childs, element)
-				}
-
+			result.Childs = append(result.Childs, ChildEntry{Name: element.Name, Element: *element})
+			if x.xpathEnabled {
+				result.childs = append(result.childs, element)
 			}
 
 		} else {
@@ -406,9 +392,6 @@ search_close_tag:
 		}
 
 		if cur == '=' {
-			if result.Attrs == nil {
-				result.Attrs = map[string]string{}
-			}
 
 			cur, err = x.readByte()
 
@@ -425,7 +408,10 @@ search_close_tag:
 			if err != nil {
 				return nil, false, x.defaultError()
 			}
-			result.Attrs[attr] = attrVal
+			result.Attrs = append(result.Attrs, AttrEntry{
+				Name:  attr,
+				Value: attrVal,
+			})
 			if x.xpathEnabled {
 				result.attrs = append(result.attrs, &xmlAttr{name: attr, value: attrVal})
 			}
@@ -876,6 +862,15 @@ func (s *scratch) addRune(r rune) int {
 func stringSliceContains(slice []string, needle string) bool {
 	for _, value := range slice {
 		if value == needle {
+			return true
+		}
+	}
+	return false
+}
+
+func sliceContains[T any](slice []T, found func(T) bool) bool {
+	for _, value := range slice {
+		if found(value) {
 			return true
 		}
 	}

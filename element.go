@@ -2,9 +2,9 @@ package xmlparser
 
 type XMLElement struct {
 	Name      string
-	Attrs     map[string]string
+	Attrs     []AttrEntry
 	InnerText string
-	Childs    map[string][]XMLElement
+	Childs    []ChildEntry
 	Err       error
 	// filled when xpath enabled
 	childs    []*XMLElement
@@ -12,6 +12,16 @@ type XMLElement struct {
 	attrs     []*xmlAttr
 	localName string
 	prefix    string
+}
+
+type AttrEntry struct {
+	Name  string
+	Value string
+}
+
+type ChildEntry struct {
+	Name    string
+	Element XMLElement
 }
 
 type xmlAttr struct {
